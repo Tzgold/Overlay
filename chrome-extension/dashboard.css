@@ -1072,6 +1072,15 @@ select.dash-form-input {
     transition: all 0.5s;
 }
 
+/* ===== Disable entrance animations after first render ===== */
+.no-intro-anim .dash-header,
+.no-intro-anim .dash-stats,
+.no-intro-anim .dash-category,
+.no-intro-anim .dash-actions,
+.no-intro-anim .dashboard {
+    animation: none !important;
+}
+
 /* ===== Footer Text ===== */
 .dash-footer-info {
     text-align: center;
