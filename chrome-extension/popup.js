@@ -510,7 +510,7 @@ function attachEventListeners() {
   // Desktop Dashboard
   document.getElementById('launchAllBtn')?.addEventListener('click', () => {
     if (!state.isExtensionEnabled) return;
-    chrome.tabs.create({ url: 'popup.html' });
+    chrome.tabs.create({ url: 'dashboard.html' });
   });
 
   // Category toggles
