@@ -30,6 +30,7 @@ let state = {
   enabledTools: {},
   toolOrder: AI_TOOLS.map(t => t.id),
   customTools: [],
+  deletedBuiltInTools: [],
   isExtensionEnabled: true,
   collapsedCategories: {},
   accentColor: '#ccff00',
@@ -71,7 +72,8 @@ function saveSettings() {
     selectedToolId: state.selectedToolId,
     selectedToolUrl: state.selectedToolUrl,
     selectedToolName: state.selectedToolName,
-    customTools: state.customTools
+    customTools: state.customTools,
+    deletedBuiltInTools: state.deletedBuiltInTools
   };
 
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
@@ -103,6 +105,7 @@ async function loadSettings() {
       state.selectedToolUrl = settings.selectedToolUrl || null;
       state.selectedToolName = settings.selectedToolName || null;
       state.customTools = settings.customTools || [];
+      state.deletedBuiltInTools = settings.deletedBuiltInTools || [];
     }
   } catch (e) {
     console.error('Error loading settings:', e);
@@ -128,7 +131,8 @@ function openUrl(url) {
 }
 
 function getSortedTools() {
-  const allTools = [...AI_TOOLS, ...state.customTools];
+  const visibleBuiltIn = AI_TOOLS.filter(t => !state.deletedBuiltInTools.includes(t.id));
+  const allTools = [...visibleBuiltIn, ...state.customTools];
   return state.toolOrder.map(id => allTools.find(t => t.id === id)).filter(Boolean);
 }
 
@@ -178,7 +182,15 @@ function handleDeleteTool(id) {
     state.selectedToolUrl = null;
     state.selectedToolName = null;
   }
-  state.customTools = state.customTools.filter(t => t.id !== id);
+  // Check if it's a built-in tool
+  const isBuiltIn = AI_TOOLS.some(t => t.id === id);
+  if (isBuiltIn) {
+    if (!state.deletedBuiltInTools.includes(id)) {
+      state.deletedBuiltInTools.push(id);
+    }
+  } else {
+    state.customTools = state.customTools.filter(t => t.id !== id);
+  }
   state.toolOrder = state.toolOrder.filter(tid => tid !== id);
   delete state.enabledTools[id];
   saveSettings();
@@ -310,11 +322,9 @@ function renderToolItem(tool) {
         </div>
       </div>
       <div class="tool-right">
-        ${tool.isCustom ? `
-          <button class="tool-btn delete" data-delete-id="${tool.id}" title="Delete Tool">
-            ${icons.trash}
-          </button>
-        ` : ''}
+        <button class="tool-btn delete" data-delete-id="${tool.id}" title="Delete Tool">
+          ${icons.trash}
+        </button>
         <button class="tool-btn" data-copy-url="${tool.url}" title="Copy URL">
           ${icons.copy}
         </button>

@@ -51,6 +51,7 @@ let state = {
   enabledTools: {},
   toolOrder: AI_TOOLS.map(t => t.id),
   customTools: [],
+  deletedBuiltInTools: [],
   isExtensionEnabled: true,
   collapsedCategories: {},
   accentColor: '#ccff00',
@@ -367,7 +368,7 @@ function renderTool(tool) {
         </div>
       </div>
       <div class="dash-tool-right">
-        ${tool.isCustom ? `<button class="dash-tool-btn delete" data-delete-id="${tool.id}" title="Delete Tool">${icons.trash}</button>` : ''}
+        <button class="dash-tool-btn delete" data-delete-id="${tool.id}" title="Delete Tool">${icons.trash}</button>
         <button class="dash-tool-btn" data-copy-url="${tool.url}" title="Copy URL">${icons.copy}</button>
         <button class="dash-tool-btn" data-launch-id="${tool.id}" data-launch-url="${tool.url}" title="Launch Tool">${icons.launch}</button>
         <button class="dash-fav ${favClass}" data-fav-id="${tool.id}" data-fav-url="${tool.url}" data-fav-name="${tool.name}" title="${isSelected ? 'Remove Quick Tool' : 'Set as Quick Tool (Alt+A)'}">${favIcon}</button>
