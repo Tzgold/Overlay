@@ -20,6 +20,13 @@ const ACCENT_COLORS = [
   { name: 'Neon Pink', value: '#ff007a' },
   { name: 'Neon Purple', value: '#bc13fe' },
   { name: 'Cyber Red', value: '#ff3131' },
+  { name: 'Ocean Teal', value: '#00ffd5' },
+  { name: 'Sunset Orange', value: '#ff6b2b' },
+  { name: 'Electric Violet', value: '#7c3aed' },
+  { name: 'Hot Magenta', value: '#ff00ff' },
+  { name: 'Golden Yellow', value: '#fbbf24' },
+  { name: 'Arctic Mint', value: '#34d399' },
+  { name: 'Rose Pink', value: '#f472b6' },
 ];
 
 const STORAGE_KEY = 'ai_hub_pro_settings_v3';
