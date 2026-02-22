@@ -257,7 +257,8 @@ function render() {
       ${renderActions()}
       <div class="dash-footer-info">Overlay Dashboard • System V3.2</div>
     </div>
-    ${renderModal()}
+    ${renderAddToolModal()}
+    ${renderSettingsModal()}
   `;
 
   attachEvents();
@@ -401,22 +402,17 @@ function renderActions() {
     </div>`;
 }
 
-function renderModal() {
-  const colorsHtml = ACCENT_COLORS.map(c => `
-    <button class="dash-color-opt ${state.accentColor === c.value ? 'selected' : ''}" data-color="${c.value}" style="background-color: ${c.value}" title="${c.name}"></button>
-  `).join('');
-
+function renderAddToolModal() {
   return `
-    <div class="dash-modal-overlay hidden" id="modalOverlay">
+    <div class="dash-modal-overlay hidden" id="addToolOverlay">
       <div class="dash-modal">
         <div class="dash-modal-header">
-          <h2 class="dash-modal-title">System Settings</h2>
-          <button class="dash-modal-close" id="modalClose">${icons.close}</button>
+          <h2 class="dash-modal-title">Add New Tool</h2>
+          <button class="dash-modal-close" id="addToolClose">${icons.close}</button>
         </div>
         <div class="dash-modal-content">
           <div class="dash-modal-sections">
             <section class="dash-modal-section">
-              <h3>Add Custom Tool</h3>
               <form id="addToolForm" class="dash-form">
                 <div class="dash-form-row">
                   <input type="text" id="toolName" placeholder="Tool Name (e.g. DeepL)" required class="dash-form-input">
@@ -430,7 +426,26 @@ function renderModal() {
                 </div>
               </form>
             </section>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
 
+function renderSettingsModal() {
+  const colorsHtml = ACCENT_COLORS.map(c => `
+    <button class="dash-color-opt ${state.accentColor === c.value ? 'selected' : ''}" data-color="${c.value}" style="background-color: ${c.value}" title="${c.name}"></button>
+  `).join('');
+
+  return `
+    <div class="dash-modal-overlay hidden" id="settingsOverlay">
+      <div class="dash-modal">
+        <div class="dash-modal-header">
+          <h2 class="dash-modal-title">System Settings</h2>
+          <button class="dash-modal-close" id="settingsClose">${icons.close}</button>
+        </div>
+        <div class="dash-modal-content">
+          <div class="dash-modal-sections">
             <section class="dash-modal-section">
               <h3>Accent Theme</h3>
               <div class="dash-colors">${colorsHtml}</div>
@@ -460,22 +475,27 @@ function renderModal() {
 
 // ========== Events ==========
 function attachEvents() {
-  // Settings button
+  // Settings button — opens settings modal only
   document.getElementById('settingsBtn')?.addEventListener('click', () => {
-    document.getElementById('modalOverlay')?.classList.remove('hidden');
+    document.getElementById('settingsOverlay')?.classList.remove('hidden');
   });
 
-  // Add tool button
+  // Add tool button — opens add tool modal only
   document.getElementById('addToolBtn')?.addEventListener('click', () => {
-    document.getElementById('modalOverlay')?.classList.remove('hidden');
-    document.getElementById('addToolForm')?.scrollIntoView({ behavior: 'smooth' });
+    document.getElementById('addToolOverlay')?.classList.remove('hidden');
   });
 
-  // Modal close
-  document.getElementById('modalClose')?.addEventListener('click', closeModal);
-  document.getElementById('closeSettingsBtn')?.addEventListener('click', closeModal);
-  document.getElementById('modalOverlay')?.addEventListener('click', (e) => {
-    if (e.target.id === 'modalOverlay') closeModal();
+  // Add Tool modal close
+  document.getElementById('addToolClose')?.addEventListener('click', closeAllModals);
+  document.getElementById('addToolOverlay')?.addEventListener('click', (e) => {
+    if (e.target.id === 'addToolOverlay') closeAllModals();
+  });
+
+  // Settings modal close
+  document.getElementById('settingsClose')?.addEventListener('click', closeAllModals);
+  document.getElementById('closeSettingsBtn')?.addEventListener('click', closeAllModals);
+  document.getElementById('settingsOverlay')?.addEventListener('click', (e) => {
+    if (e.target.id === 'settingsOverlay') closeAllModals();
   });
 
   // Add Tool form
@@ -486,7 +506,7 @@ function attachEvents() {
     const category = document.getElementById('toolCategory').value;
     if (name && url) {
       handleAddTool(name, url, category);
-      closeModal();
+      closeAllModals();
     }
   });
 
@@ -608,8 +628,9 @@ function attachEvents() {
   setupDragDrop();
 }
 
-function closeModal() {
-  document.getElementById('modalOverlay')?.classList.add('hidden');
+function closeAllModals() {
+  document.getElementById('addToolOverlay')?.classList.add('hidden');
+  document.getElementById('settingsOverlay')?.classList.add('hidden');
 }
 
 function handleAddTool(name, url, category = 'General') {
