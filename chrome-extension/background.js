@@ -17,6 +17,19 @@ async function setActiveWindowId(id) {
     }
 }
 
+async function showSystemNotification(message) {
+    try {
+        await chrome.notifications.create({
+            type: 'basic',
+            iconUrl: 'icons/icon128.png',
+            title: 'Overlay',
+            message
+        });
+    } catch (e) {
+        console.warn('Unable to show notification:', e);
+    }
+}
+
 let isProcessing = false;
 
 // Listen for keyboard commands
@@ -29,12 +42,17 @@ chrome.commands.onCommand.addListener(async (command) => {
 
         try {
             const result = await chrome.storage.local.get([STORAGE_KEY]);
-            const settings = result[STORAGE_KEY];
+            const settings = result[STORAGE_KEY] || {};
 
-            if (!settings || !settings.selectedToolUrl) {
-                // No tool selected — just log it, no injection needed
+            const isExtensionEnabled = settings.isExtensionEnabled !== false;
+            if (!isExtensionEnabled) {
+                await showSystemNotification('Overlay is offline. Turn system power on from the popup.');
+                return;
+            }
+
+            if (!settings.selectedToolUrl) {
                 console.warn('No Quick Tool selected. User needs to pick one from the popup.');
-                isProcessing = false;
+                await showSystemNotification('Pick a Quick Tool from the extension popup first.');
                 return;
             }
 
@@ -66,15 +84,15 @@ chrome.commands.onCommand.addListener(async (command) => {
             let top = 100;
 
             try {
-                const displayInfo = await chrome.system.display.getInfo();
-                if (displayInfo.length > 0) {
-                    const primaryDisplay = displayInfo.find(d => d.isPrimary) || displayInfo[0];
-                    const workArea = primaryDisplay.workArea;
-                    left = Math.round(workArea.left + (workArea.width - width) / 2);
-                    top = Math.round(workArea.top + (workArea.height - height) / 2);
+                const currentWindow = await chrome.windows.getLastFocused();
+                if (currentWindow && currentWindow.width && currentWindow.height) {
+                    const baseLeft = currentWindow.left || 0;
+                    const baseTop = currentWindow.top || 0;
+                    left = Math.round(baseLeft + (currentWindow.width - width) / 2);
+                    top = Math.round(baseTop + (currentWindow.height - height) / 2);
                 }
             } catch (e) {
-                console.log('Display info unavailable, using defaults');
+                console.log('Window positioning fallback in use');
             }
 
             const win = await chrome.windows.create({

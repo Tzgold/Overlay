@@ -6,9 +6,7 @@
     "permissions": [
         "storage",
         "tabs",
-        "activeTab",
-        "scripting",
-        "system.display"
+        "notifications"
     ],
     "action": {
         "default_popup": "popup.html",
@@ -33,19 +31,5 @@
             },
             "description": "Show/Toggle AI tool overlay"
         }
-    },
-    "content_scripts": [
-        {
-            "matches": [
-                "<all_urls>"
-            ],
-            "js": [
-                "content.js"
-            ],
-            "css": [
-                "content.css"
-            ],
-            "run_at": "document_end"
-        }
-    ]
+    }
 }
