@@ -72,6 +72,19 @@ let state = {
 let hasRenderedOnce = false;
 
 // ========== Utility ==========
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => {
+    const map = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    };
+    return map[char];
+  });
+}
+
 function saveSettings() {
   const settings = {
     enabledTools: state.enabledTools,
@@ -358,29 +371,35 @@ function renderTool(tool) {
   const flashClass = isHighlighted ? 'animate-neon-flash' : '';
   const selectedClass = isSelected ? 'selected-tool' : '';
   const disabledClass = !state.isExtensionEnabled ? 'disabled' : '';
-  const iconContent = tool.icon
-    ? `<img src="${tool.icon}" alt="${tool.name}">`
-    : `<span class="dash-tool-icon-fallback">${tool.name[0]}</span>`;
+  const safeToolId = escapeHtml(tool.id);
+  const safeToolName = escapeHtml(tool.name);
+  const safeToolDescription = escapeHtml(tool.isCustom ? 'User Added' : tool.description);
+  const safeToolUrl = escapeHtml(tool.url);
+  const safeToolInitial = escapeHtml((tool.name || '?').charAt(0));
+  const safeToolIcon = tool.icon ? escapeHtml(tool.icon) : null;
+  const iconContent = safeToolIcon
+    ? `<img src="${safeToolIcon}" alt="${safeToolName}">`
+    : `<span class="dash-tool-icon-fallback">${safeToolInitial}</span>`;
 
   const favIcon = isSelected ? icons.pinFilled : icons.pin;
   const favClass = isSelected ? 'favourite' : '';
 
   return `
-    <div class="dash-tool ${flashClass} ${selectedClass} ${disabledClass}" data-tool-id="${tool.id}">
+    <div class="dash-tool ${flashClass} ${selectedClass} ${disabledClass}" data-tool-id="${safeToolId}">
       <div class="dash-tool-left">
-        <div class="dash-drag" draggable="true" data-drag-id="${tool.id}">${icons.drag}</div>
+        <div class="dash-drag" draggable="true" data-drag-id="${safeToolId}">${icons.drag}</div>
         <div class="dash-tool-icon">${iconContent}</div>
         <div class="dash-tool-info">
-          <div class="dash-tool-name">${tool.name}</div>
-          <div class="dash-tool-desc">${tool.isCustom ? 'User Added' : tool.description}</div>
+          <div class="dash-tool-name">${safeToolName}</div>
+          <div class="dash-tool-desc">${safeToolDescription}</div>
         </div>
       </div>
       <div class="dash-tool-right">
-        <button class="dash-tool-btn delete" data-delete-id="${tool.id}" title="Delete Tool">${icons.trash}</button>
-        <button class="dash-tool-btn" data-copy-url="${tool.url}" title="Copy URL">${icons.copy}</button>
-        <button class="dash-tool-btn" data-launch-id="${tool.id}" data-launch-url="${tool.url}" title="Launch Tool">${icons.launch}</button>
-        <button class="dash-fav ${favClass}" data-fav-id="${tool.id}" data-fav-url="${tool.url}" data-fav-name="${tool.name}" title="${isSelected ? 'Remove Quick Tool' : 'Set as Quick Tool (Alt+A)'}">${favIcon}</button>
-        <button class="dash-toggle ${enabled ? 'enabled' : ''}" data-toggle-tool="${tool.id}"><span class="dash-toggle-knob"></span></button>
+        <button class="dash-tool-btn delete" data-delete-id="${safeToolId}" title="Delete Tool">${icons.trash}</button>
+        <button class="dash-tool-btn" data-copy-url="${safeToolUrl}" title="Copy URL">${icons.copy}</button>
+        <button class="dash-tool-btn" data-launch-id="${safeToolId}" data-launch-url="${safeToolUrl}" title="Launch Tool">${icons.launch}</button>
+        <button class="dash-fav ${favClass}" data-fav-id="${safeToolId}" data-fav-url="${safeToolUrl}" data-fav-name="${safeToolName}" title="${isSelected ? 'Remove Quick Tool' : 'Set as Quick Tool (Alt+A)'}">${favIcon}</button>
+        <button class="dash-toggle ${enabled ? 'enabled' : ''}" data-toggle-tool="${safeToolId}"><span class="dash-toggle-knob"></span></button>
       </div>
     </div>`;
 }

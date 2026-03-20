@@ -69,6 +69,19 @@ const icons = {
 };
 
 // Utility Functions
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => {
+    const map = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    };
+    return map[char];
+  });
+}
+
 function saveSettings() {
   const settings = {
     enabledTools: state.enabledTools,
@@ -307,42 +320,48 @@ function renderToolItem(tool) {
   const highlightClass = isHighlighted ? 'animate-neon-flash' : '';
   const disabledClass = !state.isExtensionEnabled ? 'disabled' : '';
   const selectedClass = isSelected ? 'selected-tool' : '';
+  const safeToolId = escapeHtml(tool.id);
+  const safeToolName = escapeHtml(tool.name);
+  const safeToolDescription = escapeHtml(tool.isCustom ? 'User Added' : tool.description);
+  const safeToolUrl = escapeHtml(tool.url);
+  const safeToolInitial = escapeHtml((tool.name || '?').charAt(0));
+  const safeToolIcon = tool.icon ? escapeHtml(tool.icon) : null;
 
-  const iconContent = tool.icon
-    ? `<img src="${tool.icon}" alt="${tool.name}">`
-    : `<span class="tool-icon-fallback">${tool.name[0]}</span>`;
+  const iconContent = safeToolIcon
+    ? `<img src="${safeToolIcon}" alt="${safeToolName}">`
+    : `<span class="tool-icon-fallback">${safeToolInitial}</span>`;
 
   const favIcon = isSelected ? icons.pinFilled : icons.pin;
   const favClass = isSelected ? 'favourite' : '';
 
   return `
-    <div class="tool-item ${highlightClass} ${disabledClass} ${selectedClass}" data-tool-id="${tool.id}">
+    <div class="tool-item ${highlightClass} ${disabledClass} ${selectedClass}" data-tool-id="${safeToolId}">
       <div class="tool-left">
-        <div class="drag-handle" draggable="true" data-drag-id="${tool.id}">
+        <div class="drag-handle" draggable="true" data-drag-id="${safeToolId}">
           ${icons.drag}
         </div>
         <div class="tool-icon">
           ${iconContent}
         </div>
         <div class="tool-info">
-          <h3 class="tool-name">${tool.name}</h3>
-          <p class="tool-description">${tool.isCustom ? 'User Added' : tool.description}</p>
+          <h3 class="tool-name">${safeToolName}</h3>
+          <p class="tool-description">${safeToolDescription}</p>
         </div>
       </div>
       <div class="tool-right">
-        <button class="tool-btn delete" data-delete-id="${tool.id}" title="Delete Tool">
+        <button class="tool-btn delete" data-delete-id="${safeToolId}" title="Delete Tool">
           ${icons.trash}
         </button>
-        <button class="tool-btn" data-copy-url="${tool.url}" title="Copy URL">
+        <button class="tool-btn" data-copy-url="${safeToolUrl}" title="Copy URL">
           ${icons.copy}
         </button>
-        <button class="tool-btn launch" data-launch-id="${tool.id}" data-launch-url="${tool.url}" title="Launch Tool">
+        <button class="tool-btn launch" data-launch-id="${safeToolId}" data-launch-url="${safeToolUrl}" title="Launch Tool">
           ${icons.launch}
         </button>
-        <button class="fav-toggle ${favClass}" data-fav-id="${tool.id}" data-fav-url="${tool.url}" data-fav-name="${tool.name}" title="${isSelected ? 'Remove as Quick Tool' : 'Set as Quick Tool (Alt+A)'}">
+        <button class="fav-toggle ${favClass}" data-fav-id="${safeToolId}" data-fav-url="${safeToolUrl}" data-fav-name="${safeToolName}" title="${isSelected ? 'Remove as Quick Tool' : 'Set as Quick Tool (Alt+A)'}">
           ${favIcon}
         </button>
-        <button class="toggle-switch ${enabled ? 'enabled' : ''}" data-toggle-tool="${tool.id}">
+        <button class="toggle-switch ${enabled ? 'enabled' : ''}" data-toggle-tool="${safeToolId}">
           <span class="toggle-knob"></span>
         </button>
       </div>
@@ -548,7 +567,15 @@ function attachEventListeners() {
   // Desktop Dashboard
   document.getElementById('launchAllBtn')?.addEventListener('click', () => {
     if (!state.isExtensionEnabled) return;
-    chrome.tabs.create({ url: 'dashboard.html' });
+    if (typeof chrome !== 'undefined' && chrome.windows?.create && chrome.runtime?.getURL) {
+      chrome.windows.create({
+        url: chrome.runtime.getURL('dashboard.html'),
+        type: 'normal',
+        focused: true
+      });
+      return;
+    }
+    window.open('dashboard.html', '_blank');
   });
 
   // Category toggles
