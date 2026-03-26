@@ -1,4 +1,4 @@
-# OVERLAY
+# Overlay
 
 **AI, right where you work.**
 
