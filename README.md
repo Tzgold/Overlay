@@ -1,50 +1,40 @@
 # Overlay
 
-**AI, right where you work.**
+**Version 1.0.2** · **AI, right where you work.**
 
-Overlay is a powerful Chrome extension that brings your favorite AI tools (ChatGPT, Claude, Gemini, DeepSeek, and more) directly into your workflow with a single keystroke. No more tab switching just seamless intelligence.
+Overlay is a Chrome extension that opens your chosen AI sites (ChatGPT, Claude, Gemini, DeepSeek, and more) in a small floating window—toggle it with a keyboard shortcut so you stay in flow.
 
 ![Overlay Logo](chrome-extension/icons/icon128.png)
 
-## ✨ Features
+## Features
 
-- **🚀 Instant Access**: Open your selected AI tool instantly over any web page.
-- **🖼️ Smart Overlay**: A dedicated, centered popup window that floats above your work without cluttering your browser tabs.
-- **⌨️ Global Shortcut**:
-  - `Alt+A`: **Toggle Overlay** (Show / Minimize / Restore).
-- **📌 Quick Tool Selection**: Pin your favorite AI model in the extension popup to launch it exclusively with the shortcut.
-- **💾 Session Persistence**: Your conversation state is preserved. Minimize the window to get it out of the way, and bring it back exactly where you left off.
-- **🎨 Premium Design**: A sleek, dark-themed interface designed to look great on modern OS.
+- **Quick Tool**: Click a **tool row** in the extension popup to set your Quick Tool (click again to clear). The first pick or switch opens it in the overlay; after that, use the shortcut.
+- **Shortcut**: **`Alt+A`** (Windows / Linux) or **`⌥+A`** (Mac) toggles the overlay—show, minimize, or bring it back.
+- **Overlay window**: One compact window (`550×700`); switching tools navigates that same tab. Last page URL per tool is remembered when possible (same site), so you can return to a thread instead of always landing on the home page.
+- **Optional dashboard**: Open the full dashboard from the popup to manage tools and settings in a larger UI.
+- **Local settings**: Tool order, accent color, Quick Tool choice, and saved URLs stay in Chrome’s local storage on your device.
 
-## 🛠️ Installation
+## Installation
 
-1.  **Download** or clone this repository to your local machine.
-2.  Open Google Chrome and navigate to `chrome://extensions/`.
-3.  Enable **Developer mode** by toggling the switch in the top right corner.
-4.  Click the **Load unpacked** button.
-5.  Select the **`chrome-extension`** folder located inside this project directory.
-6.  The **Overlay** extension is now installed!
+1. Download or clone this repository.
+2. Open Chrome → `chrome://extensions/`.
+3. Turn on **Developer mode**.
+4. Click **Load unpacked** and select the **`chrome-extension`** folder in this project.
 
-## 📖 Usage
+## Usage
 
-1.  **Select Your Tool**:
-    - Click the **Overlay** extension icon in your Chrome toolbar.
-    - Browse the list of available AI tools.
-    - **Click a tool row** to set it as your **Quick Tool** (click again to clear). The first time you pick or switch, it opens in the overlay window; use **Alt+A** anytime to show or hide that window.
+1. Click the **Overlay** icon in the toolbar.
+2. **Click a tool** in the list to set it as your Quick Tool (or click the same row again to clear).
+3. Press **`Alt+A`** / **`⌥+A`** from any tab to show or hide the overlay.
 
-2.  **Toggle the Overlay**:
-    - Press **`Alt+A`** on your keyboard from any tab.
-    - The AI window will appear in the center of your screen.
-    - Press **`Alt+A`** again to minimize it.
-    - Press it once more to bring it back, ready to continue your conversation.
+**Tip:** Use the **Launch** button on a row only if you want a separate large preview window; day-to-day Quick Tool behavior uses the single overlay + shortcut.
 
-## 🔒 Privacy
+## Privacy
 
-**Overlay** is built with privacy in mind.
-- **Local Execution**: The extension runs entirely locally on your machine.
-- **No Data Collection**: We do not collect, store, or transmit any of your personal data, keystrokes, or browsing history.
-- **Direct Connection**: When you use an AI tool, you are connecting directly to that service (e.g., openai.com).
+- The extension runs locally; settings are stored with `chrome.storage` on your machine.
+- It does not send your chats or browsing history to the extension author. When you open an AI site, your relationship is with that website’s terms and privacy policy.
+- Third-party names (e.g. ChatGPT, Claude) belong to their owners; Overlay is not affiliated with those services.
 
 ---
 
-*Elevate your productivity with Overlay.*
+*Overlay • v1.0.2*
