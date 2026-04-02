@@ -176,16 +176,53 @@ body {
 /* ===== Header ===== */
 .dash-header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
     margin-bottom: 40px;
     animation: fadeInUp 0.5s ease;
+    gap: 16px;
 }
 
 .dash-header-left {
     display: flex;
     align-items: center;
     gap: 16px;
+}
+
+.dash-header-brand {
+    align-items: flex-start;
+}
+
+.dash-header-hint {
+    margin-top: 10px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-muted);
+    font-weight: 500;
+    max-width: 560px;
+}
+
+.dash-header-hint strong {
+    color: var(--text-primary);
+    font-weight: 700;
+}
+
+.dash-header-kbd {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 6px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    font-size: 11px;
+    font-weight: 800;
+    font-family: ui-monospace, monospace;
+    color: var(--text-primary);
+}
+
+.dash-header-kbd-plus {
+    margin: 0 3px;
+    font-size: 11px;
+    color: var(--text-muted);
 }
 
 .dash-logo {
@@ -466,6 +503,22 @@ body {
     background: rgba(24, 24, 27, 0.3);
     transition: all 0.25s;
     cursor: default;
+}
+
+.dash-tool-selectable {
+    cursor: pointer;
+}
+
+.dash-quick-badge {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 900;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #000;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    vertical-align: middle;
 }
 
 .dash-tool:hover {

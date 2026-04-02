@@ -131,6 +131,7 @@ async function loadSettings() {
     console.error('Error loading settings:', e);
   }
 
+  syncEnabledToolsFromSelection();
   state.isLoading = false;
 }
 
@@ -173,6 +174,12 @@ function setAccentColor(color) {
   document.documentElement.style.setProperty('--accent-color', color);
 }
 
+function syncEnabledToolsFromSelection() {
+  state.enabledTools = state.selectedToolId
+    ? { [state.selectedToolId]: true }
+    : {};
+}
+
 function handleAddTool(name, url, category = 'General') {
   const id = `custom-${Date.now()}`;
   let hostname = '';
@@ -213,6 +220,7 @@ function handleDeleteTool(id) {
   }
   state.toolOrder = state.toolOrder.filter(tid => tid !== id);
   delete state.enabledTools[id];
+  syncEnabledToolsFromSelection();
   saveSettings();
   renderApp();
 }
@@ -250,12 +258,15 @@ function renderApp() {
 function renderHeader() {
   return `
     <header class="header">
-      <div style="display: flex; align-items: center;">
-        <img src="icons/icon128.png" class="header-logo" alt="Overlay Logo">
-        <div>
+      <div class="header-brand">
+        <div style="display: flex; align-items: center;">
+          <img src="icons/icon128.png" class="header-logo" alt="Overlay Logo">
+          <div>
             <h1 class="header-title">OVERLAY</h1>
             <p class="header-subtitle">AI, right where you work</p>
+          </div>
         </div>
+        <p class="header-hint">Click a tool to set your <strong>Quick Tool</strong>, then press <kbd class="header-kbd">Alt</kbd><span class="header-kbd-plus">+</span><kbd class="header-kbd">A</kbd> anywhere to open it.</p>
       </div>
       <div class="header-actions">
         <button class="settings-btn" id="addToolMainBtn" title="Add New Tool">
@@ -314,7 +325,6 @@ function renderToolsContainer() {
 }
 
 function renderToolItem(tool) {
-  const enabled = state.enabledTools[tool.id] || false;
   const isHighlighted = state.highlightedId === tool.id;
   const isSelected = state.selectedToolId === tool.id;
   const highlightClass = isHighlighted ? 'animate-neon-flash' : '';
@@ -331,11 +341,8 @@ function renderToolItem(tool) {
     ? `<img src="${safeToolIcon}" alt="${safeToolName}">`
     : `<span class="tool-icon-fallback">${safeToolInitial}</span>`;
 
-  const favIcon = isSelected ? icons.pinFilled : icons.pin;
-  const favClass = isSelected ? 'favourite' : '';
-
   return `
-    <div class="tool-item ${highlightClass} ${disabledClass} ${selectedClass}" data-tool-id="${safeToolId}">
+    <div class="tool-item tool-item-selectable ${highlightClass} ${disabledClass} ${selectedClass}" data-tool-id="${safeToolId}" title="${isSelected ? 'Click to clear Quick Tool' : 'Click to set as Quick Tool (Alt+A)'}">
       <div class="tool-left">
         <div class="drag-handle" draggable="true" data-drag-id="${safeToolId}">
           ${icons.drag}
@@ -344,7 +351,7 @@ function renderToolItem(tool) {
           ${iconContent}
         </div>
         <div class="tool-info">
-          <h3 class="tool-name">${safeToolName}</h3>
+          <h3 class="tool-name">${safeToolName}${isSelected ? ' <span class="quick-tool-badge" style="background-color: var(--accent-color)">Quick</span>' : ''}</h3>
           <p class="tool-description">${safeToolDescription}</p>
         </div>
       </div>
@@ -358,12 +365,6 @@ function renderToolItem(tool) {
         <button class="tool-btn launch" data-launch-id="${safeToolId}" data-launch-url="${safeToolUrl}" title="Launch Tool">
           ${icons.launch}
         </button>
-        <button class="fav-toggle ${favClass}" data-fav-id="${safeToolId}" data-fav-url="${safeToolUrl}" data-fav-name="${safeToolName}" title="${isSelected ? 'Remove as Quick Tool' : 'Set as Quick Tool (Alt+A)'}">
-          ${favIcon}
-        </button>
-        <button class="toggle-switch ${enabled ? 'enabled' : ''}" data-toggle-tool="${safeToolId}">
-          <span class="toggle-knob"></span>
-        </button>
       </div>
     </div>
   `;
@@ -376,10 +377,6 @@ function renderFooter() {
 
   return `
     <div class="footer">
-      <div class="footer-buttons">
-        <button class="footer-btn" id="selectAllBtn" ${disabledAttr}>SELECT ALL</button>
-        <button class="footer-btn" id="clearAllBtn" ${disabledAttr}>CLEAR ALL</button>
-      </div>
       <div class="power-container">
         <button class="power-btn ${powerEnabledClass}" id="powerBtn" style="${state.isExtensionEnabled ? `background-color: ${state.accentColor}; box-shadow: 0 0 12px ${state.accentColor}4d;` : ''}">
           ${icons.power}
@@ -461,8 +458,16 @@ function renderSettingsModal() {
               <h3>Keyboard Shortcuts</h3>
               <div class="shortcuts-list">
                 <div class="shortcut-item">
-                  <span class="shortcut-name">Show/Toggle Quick Tool Overlay</span>
+                  <span class="shortcut-name">Show / toggle Quick Tool window</span>
                   <span class="shortcut-key">Alt + A</span>
+                </div>
+                <div class="shortcut-item">
+                  <span class="shortcut-name">Open Quick Tool (same as toolbar)</span>
+                  <span class="shortcut-key">Ctrl + Shift + L</span>
+                </div>
+                <div class="shortcut-item">
+                  <span class="shortcut-name">Toggle system on / off</span>
+                  <span class="shortcut-key">Ctrl + Shift + P</span>
                 </div>
               </div>
             </section>
@@ -550,16 +555,26 @@ function attachEventListeners() {
     renderApp();
   });
 
-  // Select all / Clear all
-  document.getElementById('selectAllBtn')?.addEventListener('click', () => {
-    const allTools = [...AI_TOOLS, ...state.customTools];
-    allTools.forEach(t => state.enabledTools[t.id] = true);
-    saveSettings();
-    renderApp();
-  });
-
-  document.getElementById('clearAllBtn')?.addEventListener('click', () => {
-    state.enabledTools = {};
+  // Click a tool row to set / clear Quick Tool (Alt+A)
+  document.getElementById('toolsContainer')?.addEventListener('click', (e) => {
+    if (!state.isExtensionEnabled) return;
+    if (e.target.closest('.drag-handle')) return;
+    if (e.target.closest('.tool-btn')) return;
+    const item = e.target.closest('.tool-item');
+    if (!item) return;
+    const toolId = item.dataset.toolId;
+    const tool = getSortedTools().find(t => t.id === toolId);
+    if (!tool) return;
+    if (state.selectedToolId === toolId) {
+      state.selectedToolId = null;
+      state.selectedToolUrl = null;
+      state.selectedToolName = null;
+    } else {
+      state.selectedToolId = tool.id;
+      state.selectedToolUrl = tool.url;
+      state.selectedToolName = tool.name;
+    }
+    syncEnabledToolsFromSelection();
     saveSettings();
     renderApp();
   });
@@ -588,17 +603,6 @@ function attachEventListeners() {
     });
   });
 
-  // Tool toggles
-  document.querySelectorAll('[data-toggle-tool]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const toolId = btn.dataset.toggleTool;
-      state.enabledTools[toolId] = !state.enabledTools[toolId];
-      saveSettings();
-      renderApp();
-    });
-  });
-
   // Copy URL buttons
   document.querySelectorAll('[data-copy-url]').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -612,29 +616,6 @@ function attachEventListeners() {
           btn.classList.remove('copied');
         }, 2000);
       });
-    });
-  });
-
-  // Favourite toggle (set quick tool for Alt+A)
-  document.querySelectorAll('[data-fav-id]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const toolId = btn.dataset.favId;
-      const toolUrl = btn.dataset.favUrl;
-      const toolName = btn.dataset.favName;
-
-      // Toggle off if already selected
-      if (state.selectedToolId === toolId) {
-        state.selectedToolId = null;
-        state.selectedToolUrl = null;
-        state.selectedToolName = null;
-      } else {
-        state.selectedToolId = toolId;
-        state.selectedToolUrl = toolUrl;
-        state.selectedToolName = toolName;
-      }
-      saveSettings();
-      renderApp();
     });
   });
 
@@ -678,13 +659,8 @@ function handleKeyDown(e) {
       renderApp();
     } else if (e.key.toUpperCase() === 'L') {
       e.preventDefault();
-      if (state.isExtensionEnabled) {
-        const allTools = [...AI_TOOLS, ...state.customTools];
-        allTools.forEach(t => {
-          if (state.enabledTools[t.id]) {
-            openUrl(t.url);
-          }
-        });
+      if (state.isExtensionEnabled && state.selectedToolUrl) {
+        openUrl(state.selectedToolUrl);
       }
     }
   }

@@ -128,6 +128,7 @@ async function loadSettings() {
   } catch (e) {
     console.error('Error loading settings:', e);
   }
+  syncEnabledToolsFromSelection();
   state.isLoading = false;
 }
 
@@ -159,88 +160,17 @@ function getCategorizedTools() {
 }
 
 function getEnabledCount() {
-  return Object.values(state.enabledTools).filter(Boolean).length;
+  return state.selectedToolId ? 1 : 0;
 }
 
 function setAccentVar(color) {
   document.documentElement.style.setProperty('--accent', color);
 }
 
-// ========== Smart Update (no full re-render) ==========
-
-// Update just the toggle switch for a specific tool (no re-render)
-function updateToolToggleInPlace(toolId) {
-  const toolEl = document.querySelector(`.dash-tool[data-tool-id="${toolId}"]`);
-  if (!toolEl) return false;
-
-  const toggleBtn = toolEl.querySelector(`[data-toggle-tool="${toolId}"]`);
-  if (!toggleBtn) return false;
-
-  const enabled = !!state.enabledTools[toolId];
-  if (enabled) {
-    toggleBtn.classList.add('enabled');
-  } else {
-    toggleBtn.classList.remove('enabled');
-  }
-
-  // Update the active count in the stats bar
-  updateStatsInPlace();
-  return true;
-}
-
-// Update just the fav/pin state for a specific tool (no re-render)
-function updateFavInPlace(toolId, previousSelectedId) {
-  // Remove selection from previously selected tool
-  if (previousSelectedId) {
-    const prevToolEl = document.querySelector(`.dash-tool[data-tool-id="${previousSelectedId}"]`);
-    if (prevToolEl) {
-      prevToolEl.classList.remove('selected-tool');
-      const prevFavBtn = prevToolEl.querySelector(`[data-fav-id="${previousSelectedId}"]`);
-      if (prevFavBtn) {
-        prevFavBtn.classList.remove('favourite');
-        prevFavBtn.innerHTML = icons.pin;
-        prevFavBtn.title = 'Set as Quick Tool (Alt+A)';
-      }
-    }
-  }
-
-  // Add selection to newly selected tool
-  if (state.selectedToolId) {
-    const newToolEl = document.querySelector(`.dash-tool[data-tool-id="${state.selectedToolId}"]`);
-    if (newToolEl) {
-      newToolEl.classList.add('selected-tool');
-      const newFavBtn = newToolEl.querySelector(`[data-fav-id="${state.selectedToolId}"]`);
-      if (newFavBtn) {
-        newFavBtn.classList.add('favourite');
-        newFavBtn.innerHTML = icons.pinFilled;
-        newFavBtn.title = 'Remove Quick Tool';
-      }
-    }
-  }
-  return true;
-}
-
-// Update just the stats numbers
-function updateStatsInPlace() {
-  const enabledCount = getEnabledCount();
-  const activeValueEl = document.querySelector('.dash-stat-card:nth-child(2) .dash-stat-value');
-  if (activeValueEl) {
-    activeValueEl.textContent = enabledCount;
-  }
-}
-
-// Update all toggle states (for select all / clear all)
-function updateAllTogglesInPlace() {
-  document.querySelectorAll('[data-toggle-tool]').forEach(btn => {
-    const id = btn.dataset.toggleTool;
-    const enabled = !!state.enabledTools[id];
-    if (enabled) {
-      btn.classList.add('enabled');
-    } else {
-      btn.classList.remove('enabled');
-    }
-  });
-  updateStatsInPlace();
+function syncEnabledToolsFromSelection() {
+  state.enabledTools = state.selectedToolId
+    ? { [state.selectedToolId]: true }
+    : {};
 }
 
 // ========== Full Render (with scroll preservation) ==========
@@ -293,11 +223,12 @@ function render() {
 function renderHeader() {
   return `
     <div class="dash-header">
-      <div class="dash-header-left">
+      <div class="dash-header-left dash-header-brand">
         <img src="icons/icon128.png" class="dash-logo" alt="Overlay Logo">
         <div>
           <div class="dash-brand-title">OVERLAY <span class="dash-brand-accent">PRO</span></div>
           <div class="dash-brand-sub">AI, right where you work</div>
+          <p class="dash-header-hint">Click a tool to set your <strong>Quick Tool</strong>, then press <kbd class="dash-header-kbd">Alt</kbd><span class="dash-header-kbd-plus">+</span><kbd class="dash-header-kbd">A</kbd> anywhere to open it.</p>
         </div>
       </div>
       <div class="dash-header-right">
@@ -322,7 +253,7 @@ function renderStats(total, enabled) {
       <div class="dash-stat-card">
         <div class="dash-stat-icon active-icon">${icons.bolt}</div>
         <div>
-          <div class="dash-stat-label">Active</div>
+          <div class="dash-stat-label">Quick tool</div>
           <div class="dash-stat-value">${enabled}</div>
         </div>
       </div>
@@ -365,7 +296,6 @@ function renderGrid(catTools) {
 }
 
 function renderTool(tool) {
-  const enabled = !!state.enabledTools[tool.id];
   const isHighlighted = state.highlightedId === tool.id;
   const isSelected = state.selectedToolId === tool.id;
   const flashClass = isHighlighted ? 'animate-neon-flash' : '';
@@ -381,16 +311,13 @@ function renderTool(tool) {
     ? `<img src="${safeToolIcon}" alt="${safeToolName}">`
     : `<span class="dash-tool-icon-fallback">${safeToolInitial}</span>`;
 
-  const favIcon = isSelected ? icons.pinFilled : icons.pin;
-  const favClass = isSelected ? 'favourite' : '';
-
   return `
-    <div class="dash-tool ${flashClass} ${selectedClass} ${disabledClass}" data-tool-id="${safeToolId}">
+    <div class="dash-tool dash-tool-selectable ${flashClass} ${selectedClass} ${disabledClass}" data-tool-id="${safeToolId}" title="${isSelected ? 'Click to clear Quick Tool' : 'Click to set as Quick Tool (Alt+A)'}">
       <div class="dash-tool-left">
         <div class="dash-drag" draggable="true" data-drag-id="${safeToolId}">${icons.drag}</div>
         <div class="dash-tool-icon">${iconContent}</div>
         <div class="dash-tool-info">
-          <div class="dash-tool-name">${safeToolName}</div>
+          <div class="dash-tool-name">${safeToolName}${isSelected ? ` <span class="dash-quick-badge" style="background: ${state.accentColor}">Quick</span>` : ''}</div>
           <div class="dash-tool-desc">${safeToolDescription}</div>
         </div>
       </div>
@@ -398,31 +325,26 @@ function renderTool(tool) {
         <button class="dash-tool-btn delete" data-delete-id="${safeToolId}" title="Delete Tool">${icons.trash}</button>
         <button class="dash-tool-btn" data-copy-url="${safeToolUrl}" title="Copy URL">${icons.copy}</button>
         <button class="dash-tool-btn" data-launch-id="${safeToolId}" data-launch-url="${safeToolUrl}" title="Launch Tool">${icons.launch}</button>
-        <button class="dash-fav ${favClass}" data-fav-id="${safeToolId}" data-fav-url="${safeToolUrl}" data-fav-name="${safeToolName}" title="${isSelected ? 'Remove Quick Tool' : 'Set as Quick Tool (Alt+A)'}">${favIcon}</button>
-        <button class="dash-toggle ${enabled ? 'enabled' : ''}" data-toggle-tool="${safeToolId}"><span class="dash-toggle-knob"></span></button>
       </div>
     </div>`;
 }
 
 function renderActions() {
   const disabledAttr = !state.isExtensionEnabled ? 'disabled' : '';
+  const launchDisabledAttr = !state.isExtensionEnabled || !state.selectedToolUrl ? 'disabled' : '';
   const powerClass = state.isExtensionEnabled ? 'enabled' : '';
-  const launchClass = state.isExtensionEnabled ? 'enabled' : '';
+  const launchClass = state.isExtensionEnabled && state.selectedToolUrl ? 'enabled' : '';
   const powerStyle = state.isExtensionEnabled ? `background-color: ${state.accentColor};` : '';
 
   return `
     <div class="dash-actions">
-      <div class="dash-action-group">
-        <button class="dash-action-btn" id="selectAllBtn" ${disabledAttr}>Select All</button>
-        <button class="dash-action-btn" id="clearAllBtn" ${disabledAttr}>Clear All</button>
-      </div>
       <div class="dash-spacer"></div>
       <div class="dash-power-group">
         <button class="dash-power-btn ${powerClass}" id="powerBtn" style="${powerStyle}">${icons.power}</button>
         <span class="dash-power-status" style="${state.isExtensionEnabled ? `color: ${state.accentColor}` : ''}">${state.isExtensionEnabled ? 'SYSTEM ONLINE' : 'SYSTEM OFFLINE'}</span>
       </div>
-      <button class="dash-launch-btn ${launchClass}" id="launchAllBtn" ${disabledAttr}>
-        <span>Launch Selected</span>
+      <button class="dash-launch-btn ${launchClass}" id="launchAllBtn" ${launchDisabledAttr} title="${state.selectedToolUrl ? 'Open your Quick Tool in a window' : 'Select a Quick Tool first'}">
+        <span>Open Quick Tool</span>
         ${icons.arrowRight}
       </button>
     </div>`;
@@ -481,8 +403,16 @@ function renderSettingsModal() {
               <h3>Keyboard Shortcuts</h3>
               <div class="dash-shortcuts">
                 <div class="dash-shortcut-item">
-                  <span class="dash-shortcut-name">Show/Toggle Quick Tool Overlay</span>
+                  <span class="dash-shortcut-name">Show / toggle Quick Tool window</span>
                   <span class="dash-shortcut-key">Alt + A</span>
+                </div>
+                <div class="dash-shortcut-item">
+                  <span class="dash-shortcut-name">Open Quick Tool in a window</span>
+                  <span class="dash-shortcut-key">Ctrl + Shift + L</span>
+                </div>
+                <div class="dash-shortcut-item">
+                  <span class="dash-shortcut-name">Toggle system on / off</span>
+                  <span class="dash-shortcut-key">Ctrl + Shift + P</span>
                 </div>
               </div>
             </section>
@@ -560,26 +490,34 @@ function attachEvents() {
     render();
   });
 
-  // Select All — in-place update, no full re-render
-  document.getElementById('selectAllBtn')?.addEventListener('click', () => {
-    getAllTools().forEach(t => state.enabledTools[t.id] = true);
-    saveSettings();
-    updateAllTogglesInPlace();
-  });
-
-  // Clear All — in-place update, no full re-render
-  document.getElementById('clearAllBtn')?.addEventListener('click', () => {
-    state.enabledTools = {};
-    saveSettings();
-    updateAllTogglesInPlace();
-  });
-
-  // Launch All
-  document.getElementById('launchAllBtn')?.addEventListener('click', () => {
+  // Click a tool row to set / clear Quick Tool (Alt+A)
+  document.getElementById('toolsArea')?.addEventListener('click', (e) => {
     if (!state.isExtensionEnabled) return;
-    getAllTools().forEach(t => {
-      if (state.enabledTools[t.id]) openUrl(t.url);
-    });
+    if (e.target.closest('.dash-drag')) return;
+    if (e.target.closest('.dash-tool-btn')) return;
+    const row = e.target.closest('.dash-tool');
+    if (!row) return;
+    const toolId = row.dataset.toolId;
+    const tool = getSortedTools().find(t => t.id === toolId);
+    if (!tool) return;
+    if (state.selectedToolId === toolId) {
+      state.selectedToolId = null;
+      state.selectedToolUrl = null;
+      state.selectedToolName = null;
+    } else {
+      state.selectedToolId = tool.id;
+      state.selectedToolUrl = tool.url;
+      state.selectedToolName = tool.name;
+    }
+    syncEnabledToolsFromSelection();
+    saveSettings();
+    render();
+  });
+
+  // Open Quick Tool in a window (same as Alt+A target)
+  document.getElementById('launchAllBtn')?.addEventListener('click', () => {
+    if (!state.isExtensionEnabled || !state.selectedToolUrl) return;
+    openUrl(state.selectedToolUrl);
   });
 
   // Category toggles
@@ -592,17 +530,6 @@ function attachEvents() {
     });
   });
 
-  // Tool toggles — in-place update, no full re-render
-  document.querySelectorAll('[data-toggle-tool]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const id = btn.dataset.toggleTool;
-      state.enabledTools[id] = !state.enabledTools[id];
-      saveSettings();
-      updateToolToggleInPlace(id);
-    });
-  });
-
   // Copy URL
   document.querySelectorAll('[data-copy-url]').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -612,27 +539,6 @@ function attachEvents() {
         btn.classList.add('copied');
         setTimeout(() => { btn.innerHTML = icons.copy; btn.classList.remove('copied'); }, 2000);
       });
-    });
-  });
-
-  // Fav toggle — in-place update, no full re-render
-  document.querySelectorAll('[data-fav-id]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const id = btn.dataset.favId;
-      const previousSelectedId = state.selectedToolId;
-
-      if (state.selectedToolId === id) {
-        state.selectedToolId = null;
-        state.selectedToolUrl = null;
-        state.selectedToolName = null;
-      } else {
-        state.selectedToolId = id;
-        state.selectedToolUrl = btn.dataset.favUrl;
-        state.selectedToolName = btn.dataset.favName;
-      }
-      saveSettings();
-      updateFavInPlace(id, previousSelectedId);
     });
   });
 
@@ -684,6 +590,7 @@ function handleDeleteTool(id) {
   state.customTools = state.customTools.filter(t => t.id !== id);
   state.toolOrder = state.toolOrder.filter(tid => tid !== id);
   delete state.enabledTools[id];
+  syncEnabledToolsFromSelection();
   saveSettings();
   render();
 }
