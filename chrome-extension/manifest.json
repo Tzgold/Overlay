@@ -1,11 +1,13 @@
 {
     "manifest_version": 3,
     "name": "Overlay",
-    "version": "1.0.1",
-    "description": "AI, right where you work.",
+    "version": "1.0.2",
+    "description": "Open your chosen AI site in a floating window. Pick a Quick Tool, press Alt+A to show or hide it.",
     "permissions": [
         "storage",
-        "notifications"
+        "notifications",
+        "tabs",
+        "windows"
     ],
     "action": {
         "default_popup": "popup.html",

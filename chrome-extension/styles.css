@@ -152,6 +152,36 @@ body {
     color: #71717a;
 }
 
+.header-os-keys {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 6px;
+    font-size: 10px;
+    line-height: 1.35;
+}
+
+.header-os-group {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex: 0 1 auto;
+    min-width: 0;
+}
+
+.header-os-name {
+    flex-shrink: 0;
+    font-size: 9px;
+    font-weight: 700;
+    color: #71717a;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+
 .header-title {
     font-size: 18px;
     font-weight: 700;

@@ -69,6 +69,13 @@ const icons = {
 };
 
 // Utility Functions
+function sanitizeAccentColor(value) {
+  const v = String(value ?? '');
+  if (/^#[0-9A-Fa-f]{6}$/.test(v)) return v;
+  const preset = ACCENT_COLORS.find((c) => c.value === v);
+  return preset ? preset.value : '#ccff00';
+}
+
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => {
     const map = {
@@ -97,10 +104,10 @@ function saveSettings() {
   };
 
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-    chrome.storage.local.set({ [STORAGE_KEY]: settings });
-  } else {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    return chrome.storage.local.set({ [STORAGE_KEY]: settings });
   }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  return Promise.resolve();
 }
 
 async function loadSettings() {
@@ -118,7 +125,7 @@ async function loadSettings() {
     if (settings) {
       state.enabledTools = settings.enabledTools || {};
       state.isExtensionEnabled = settings.isExtensionEnabled !== undefined ? settings.isExtensionEnabled : true;
-      state.accentColor = settings.accentColor || '#ccff00';
+      state.accentColor = sanitizeAccentColor(settings.accentColor);
       if (settings.toolOrder?.length > 0) state.toolOrder = settings.toolOrder;
       if (settings.collapsedCategories) state.collapsedCategories = settings.collapsedCategories;
       state.selectedToolId = settings.selectedToolId || null;
@@ -148,6 +155,24 @@ function openUrl(url) {
     });
   } else {
     window.open(url, '_blank', 'width=1000,height=800,scrollbars=yes,resizable=yes');
+  }
+}
+
+/** Opens or focuses the tracked overlay window (single tab; saved URLs per tool when switching). */
+function openQuickToolWindow(url, toolId) {
+  if (!state.isExtensionEnabled) return;
+  if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+    chrome.runtime.sendMessage({ action: 'openOrNavigateQuickTool', url, toolId }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.warn('openQuickToolWindow:', chrome.runtime.lastError.message);
+        return;
+      }
+      if (!response?.ok) {
+        console.warn('openQuickToolWindow failed:', response?.error);
+      }
+    });
+  } else {
+    openUrl(url);
   }
 }
 
@@ -266,7 +291,17 @@ function renderHeader() {
             <p class="header-subtitle">AI, right where you work</p>
           </div>
         </div>
-        <p class="header-hint">Click a tool to set your <strong>Quick Tool</strong>, then press <kbd class="header-kbd">Alt</kbd><span class="header-kbd-plus">+</span><kbd class="header-kbd">A</kbd> anywhere to open it.</p>
+        <p class="header-hint">Quick Tool: click a row — first pick opens once.</p>
+        <div class="header-os-keys" aria-label="Shortcuts by OS">
+          <div class="header-os-group">
+            <span class="header-os-name">Win / Linux</span>
+            <kbd class="header-kbd">Alt</kbd><span class="header-kbd-plus">+</span><kbd class="header-kbd">A</kbd>
+          </div>
+          <div class="header-os-group">
+            <span class="header-os-name">Mac</span>
+            <kbd class="header-kbd" title="Option">⌥</kbd><span class="header-kbd-plus">+</span><kbd class="header-kbd">A</kbd>
+          </div>
+        </div>
       </div>
       <div class="header-actions">
         <button class="settings-btn" id="addToolMainBtn" title="Add New Tool">
@@ -459,15 +494,15 @@ function renderSettingsModal() {
               <div class="shortcuts-list">
                 <div class="shortcut-item">
                   <span class="shortcut-name">Show / toggle Quick Tool window</span>
-                  <span class="shortcut-key">Alt + A</span>
+                  <span class="shortcut-key">Alt+A · Mac: ⌥+A</span>
                 </div>
                 <div class="shortcut-item">
-                  <span class="shortcut-name">Open Quick Tool (same as toolbar)</span>
-                  <span class="shortcut-key">Ctrl + Shift + L</span>
+                  <span class="shortcut-name">Open Quick Tool (popup only)</span>
+                  <span class="shortcut-key">Ctrl+Shift+L · Mac: ⌘⇧L</span>
                 </div>
                 <div class="shortcut-item">
                   <span class="shortcut-name">Toggle system on / off</span>
-                  <span class="shortcut-key">Ctrl + Shift + P</span>
+                  <span class="shortcut-key">Ctrl+Shift+P · Mac: ⌘⇧P</span>
                 </div>
               </div>
             </section>
@@ -556,7 +591,7 @@ function attachEventListeners() {
   });
 
   // Click a tool row to set / clear Quick Tool (Alt+A)
-  document.getElementById('toolsContainer')?.addEventListener('click', (e) => {
+  document.getElementById('toolsContainer')?.addEventListener('click', async (e) => {
     if (!state.isExtensionEnabled) return;
     if (e.target.closest('.drag-handle')) return;
     if (e.target.closest('.tool-btn')) return;
@@ -569,14 +604,18 @@ function attachEventListeners() {
       state.selectedToolId = null;
       state.selectedToolUrl = null;
       state.selectedToolName = null;
+      syncEnabledToolsFromSelection();
+      saveSettings();
+      renderApp();
     } else {
       state.selectedToolId = tool.id;
       state.selectedToolUrl = tool.url;
       state.selectedToolName = tool.name;
+      syncEnabledToolsFromSelection();
+      await saveSettings();
+      openQuickToolWindow(tool.url, tool.id);
+      renderApp();
     }
-    syncEnabledToolsFromSelection();
-    saveSettings();
-    renderApp();
   });
 
   // Desktop Dashboard
@@ -659,8 +698,8 @@ function handleKeyDown(e) {
       renderApp();
     } else if (e.key.toUpperCase() === 'L') {
       e.preventDefault();
-      if (state.isExtensionEnabled && state.selectedToolUrl) {
-        openUrl(state.selectedToolUrl);
+      if (state.isExtensionEnabled && state.selectedToolUrl && state.selectedToolId) {
+        openQuickToolWindow(state.selectedToolUrl, state.selectedToolId);
       }
     }
   }

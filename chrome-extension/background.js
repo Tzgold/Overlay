@@ -2,8 +2,42 @@
 
 const STORAGE_KEY = 'ai_hub_pro_settings_v3';
 const WINDOW_ID_KEY = 'overlay_active_window_id';
+/** toolId -> last full URL for that tool (restore same chat when switching back). */
+const LAST_URL_KEY = 'overlay_quick_tool_last_url';
+/** Prefer last URL for this tool (same origin as fallback). */
+async function getResolvedUrlForTool(toolId, fallbackUrl) {
+    if (!fallbackUrl) return null;
+    const data = await chrome.storage.local.get(LAST_URL_KEY);
+    const map = data[LAST_URL_KEY] || {};
+    const last = toolId ? map[toolId] : null;
+    if (!last || typeof last !== 'string') return fallbackUrl;
+    try {
+        if (new URL(last).origin === new URL(fallbackUrl).origin) {
+            return last;
+        }
+    } catch (e) {
+        console.warn('getResolvedUrlForTool:', e);
+    }
+    return fallbackUrl;
+}
 
-// Helper to get/set active window ID
+async function setLastUrlForTool(toolId, url) {
+    if (!toolId || !url) return;
+    if (url.startsWith('chrome://') || url.startsWith('chrome-extension://') || url.startsWith('devtools://')) {
+        return;
+    }
+    const data = await chrome.storage.local.get(LAST_URL_KEY);
+    const map = data[LAST_URL_KEY] || {};
+    if (map[toolId] === url) return;
+    map[toolId] = url;
+    await chrome.storage.local.set({ [LAST_URL_KEY]: map });
+}
+
+async function getSelectedToolIdFromStorage() {
+    const result = await chrome.storage.local.get([STORAGE_KEY]);
+    return result[STORAGE_KEY]?.selectedToolId || null;
+}
+
 async function getActiveWindowId() {
     const result = await chrome.storage.local.get([WINDOW_ID_KEY]);
     return result[WINDOW_ID_KEY];
@@ -15,6 +49,87 @@ async function setActiveWindowId(id) {
     } else {
         await chrome.storage.local.set({ [WINDOW_ID_KEY]: id });
     }
+}
+
+async function getFirstTabIdInWindow(windowId) {
+    const tabs = await chrome.tabs.query({ windowId });
+    return tabs[0]?.id ?? null;
+}
+
+/**
+ * Popup-type windows only reliably support ONE tab. Extra tabs.create targets often open in the normal browser.
+ * Always navigate the single overlay tab with tabs.update.
+ */
+async function navigateOverlayTab(windowId, toolId, fallbackUrl) {
+    const openUrl = toolId ? await getResolvedUrlForTool(toolId, fallbackUrl) : fallbackUrl;
+    if (!openUrl) return;
+
+    const tabId = await getFirstTabIdInWindow(windowId);
+    if (!tabId) {
+        console.warn('navigateOverlayTab: no tab in overlay window');
+        return;
+    }
+    await chrome.tabs.update(tabId, { url: openUrl, active: true });
+}
+
+/** Alt+A: show the right URL for the current Quick Tool in the single overlay tab. */
+async function focusTabForCurrentSelection(windowId, selectedToolId, selectedToolUrl) {
+    if (!selectedToolId || !selectedToolUrl) return;
+    await navigateOverlayTab(windowId, selectedToolId, selectedToolUrl);
+}
+
+async function createQuickToolWindow(url) {
+    const width = 550;
+    const height = 700;
+    let left = 100;
+    let top = 100;
+
+    try {
+        const currentWindow = await chrome.windows.getLastFocused();
+        if (currentWindow && currentWindow.width && currentWindow.height) {
+            const baseLeft = currentWindow.left || 0;
+            const baseTop = currentWindow.top || 0;
+            left = Math.round(baseLeft + (currentWindow.width - width) / 2);
+            top = Math.round(baseTop + (currentWindow.height - height) / 2);
+        }
+    } catch (e) {
+        /* ignore: position fallback */
+    }
+
+    return chrome.windows.create({
+        url,
+        type: 'popup',
+        width,
+        height,
+        left,
+        top,
+        focused: true
+    });
+}
+
+/**
+ * Single tab in the overlay popup window — all tool switches use tabs.update so nothing opens in the main browser.
+ */
+async function openOrNavigateQuickToolWindow(url, toolId) {
+    let activeWindowId = await getActiveWindowId();
+    if (activeWindowId) {
+        try {
+            await chrome.windows.get(activeWindowId);
+        } catch (e) {
+            await setActiveWindowId(null);
+            activeWindowId = null;
+        }
+    }
+
+    if (activeWindowId) {
+        await navigateOverlayTab(activeWindowId, toolId, url);
+        await chrome.windows.update(activeWindowId, { focused: true, state: 'normal' });
+        return;
+    }
+
+    const openUrl = toolId ? await getResolvedUrlForTool(toolId, url) : url;
+    const win = await createQuickToolWindow(openUrl);
+    await setActiveWindowId(win.id);
 }
 
 async function showSystemNotification(message) {
@@ -32,10 +147,7 @@ async function showSystemNotification(message) {
 
 let isProcessing = false;
 
-// Listen for keyboard commands
 chrome.commands.onCommand.addListener(async (command) => {
-    console.log('Command received:', command);
-
     if (command === 'toggle-overlay') {
         if (isProcessing) return;
         isProcessing = true;
@@ -56,55 +168,33 @@ chrome.commands.onCommand.addListener(async (command) => {
                 return;
             }
 
-            // Check if window already exists
             const activeWindowId = await getActiveWindowId();
 
             if (activeWindowId) {
                 try {
                     const win = await chrome.windows.get(activeWindowId);
 
-                    // If window is focused, minimize it
                     if (win.focused) {
                         await chrome.windows.update(activeWindowId, { state: 'minimized' });
                     } else {
-                        // If not focused (or minimized), bring to front
+                        await focusTabForCurrentSelection(
+                            activeWindowId,
+                            settings.selectedToolId,
+                            settings.selectedToolUrl
+                        );
                         await chrome.windows.update(activeWindowId, { focused: true, state: 'normal' });
                     }
                     return;
                 } catch (e) {
-                    // Window doesn't exist anymore
                     await setActiveWindowId(null);
                 }
             }
 
-            // Create new window
-            const width = 550;
-            const height = 700;
-            let left = 100;
-            let top = 100;
-
-            try {
-                const currentWindow = await chrome.windows.getLastFocused();
-                if (currentWindow && currentWindow.width && currentWindow.height) {
-                    const baseLeft = currentWindow.left || 0;
-                    const baseTop = currentWindow.top || 0;
-                    left = Math.round(baseLeft + (currentWindow.width - width) / 2);
-                    top = Math.round(baseTop + (currentWindow.height - height) / 2);
-                }
-            } catch (e) {
-                console.log('Window positioning fallback in use');
-            }
-
-            const win = await chrome.windows.create({
-                url: settings.selectedToolUrl,
-                type: 'popup',
-                width: width,
-                height: height,
-                left: left,
-                top: top,
-                focused: true
-            });
-
+            const openUrl = await getResolvedUrlForTool(
+                settings.selectedToolId,
+                settings.selectedToolUrl
+            );
+            const win = await createQuickToolWindow(openUrl);
             await setActiveWindowId(win.id);
         } catch (err) {
             console.error('Error in toggle-overlay:', err);
@@ -114,7 +204,41 @@ chrome.commands.onCommand.addListener(async (command) => {
     }
 });
 
-// Clean up when window is closed
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.action === 'openOrNavigateQuickTool' && typeof message.url === 'string') {
+        const toolId = typeof message.toolId === 'string' ? message.toolId : undefined;
+        openOrNavigateQuickToolWindow(message.url, toolId)
+            .then(() => sendResponse({ ok: true }))
+            .catch((err) => {
+                console.error('openOrNavigateQuickTool:', err);
+                sendResponse({ ok: false, error: String(err) });
+            });
+        return true;
+    }
+    return false;
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (!tab.url) return;
+    if (!changeInfo.url && changeInfo.status !== 'complete') return;
+
+    getActiveWindowId().then(async (overlayWid) => {
+        if (!overlayWid) return;
+        try {
+            const t = await chrome.tabs.get(tabId);
+            if (t.windowId !== overlayWid) return;
+        } catch (e) {
+            return;
+        }
+        if (tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://')) return;
+
+        const toolId = await getSelectedToolIdFromStorage();
+        if (toolId) {
+            await setLastUrlForTool(toolId, tab.url);
+        }
+    });
+});
+
 chrome.windows.onRemoved.addListener(async (windowId) => {
     const activeWindowId = await getActiveWindowId();
     if (windowId === activeWindowId) {

@@ -1,4 +1,4 @@
-# OVERLAY
+# Overlay
 
 **AI, right where you work.**
 
@@ -30,7 +30,7 @@ Overlay is a powerful Chrome extension that brings your favorite AI tools (ChatG
 1.  **Select Your Tool**:
     - Click the **Overlay** extension icon in your Chrome toolbar.
     - Browse the list of available AI tools.
-    - Click the **Pin icon** 📌 next to your preferred tool (e.g., ChatGPT) to set it as your "Quick Tool".
+    - **Click a tool row** to set it as your **Quick Tool** (click again to clear). The first time you pick or switch, it opens in the overlay window; use **Alt+A** anytime to show or hide that window.
 
 2.  **Toggle the Overlay**:
     - Press **`Alt+A`** on your keyboard from any tab.
