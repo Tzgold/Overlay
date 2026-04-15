@@ -4,6 +4,8 @@ const STORAGE_KEY = 'ai_hub_pro_settings_v3';
 const WINDOW_ID_KEY = 'overlay_active_window_id';
 /** toolId -> last full URL for that tool (restore same chat when switching back). */
 const LAST_URL_KEY = 'overlay_quick_tool_last_url';
+/** Last Quick Tool id we loaded in the overlay tab (so Alt+A can focus without navigating = no refresh / new chat). */
+const OVERLAY_SYNCED_TOOL_ID_KEY = 'overlay_synced_tool_id';
 /** Prefer last URL for this tool (same origin as fallback). */
 async function getResolvedUrlForTool(toolId, fallbackUrl) {
     if (!fallbackUrl) return null;
@@ -56,9 +58,30 @@ async function getFirstTabIdInWindow(windowId) {
     return tabs[0]?.id ?? null;
 }
 
+async function getOverlaySyncedToolId() {
+    const r = await chrome.storage.local.get(OVERLAY_SYNCED_TOOL_ID_KEY);
+    return r[OVERLAY_SYNCED_TOOL_ID_KEY] ?? null;
+}
+
+async function setOverlaySyncedToolId(toolId) {
+    if (toolId) {
+        await chrome.storage.local.set({ [OVERLAY_SYNCED_TOOL_ID_KEY]: toolId });
+    } else {
+        await chrome.storage.local.remove([OVERLAY_SYNCED_TOOL_ID_KEY]);
+    }
+}
+
+/** Bring overlay forward and activate its tab without changing URL (avoids reload / new chat on Alt+A). */
+async function focusOverlayWithoutNavigation(windowId) {
+    const tabId = await getFirstTabIdInWindow(windowId);
+    if (tabId) {
+        await chrome.tabs.update(tabId, { active: true });
+    }
+    await chrome.windows.update(windowId, { focused: true, state: 'normal' });
+}
+
 /**
- * Popup-type windows only reliably support ONE tab. Extra tabs.create targets often open in the normal browser.
- * Always navigate the single overlay tab with tabs.update.
+ * Popup-type windows only reliably support ONE tab. Navigate that tab when switching tools or first open.
  */
 async function navigateOverlayTab(windowId, toolId, fallbackUrl) {
     const openUrl = toolId ? await getResolvedUrlForTool(toolId, fallbackUrl) : fallbackUrl;
@@ -70,12 +93,9 @@ async function navigateOverlayTab(windowId, toolId, fallbackUrl) {
         return;
     }
     await chrome.tabs.update(tabId, { url: openUrl, active: true });
-}
-
-/** Alt+A: show the right URL for the current Quick Tool in the single overlay tab. */
-async function focusTabForCurrentSelection(windowId, selectedToolId, selectedToolUrl) {
-    if (!selectedToolId || !selectedToolUrl) return;
-    await navigateOverlayTab(windowId, selectedToolId, selectedToolUrl);
+    if (toolId) {
+        await setOverlaySyncedToolId(toolId);
+    }
 }
 
 async function createQuickToolWindow(url) {
@@ -130,6 +150,9 @@ async function openOrNavigateQuickToolWindow(url, toolId) {
     const openUrl = toolId ? await getResolvedUrlForTool(toolId, url) : url;
     const win = await createQuickToolWindow(openUrl);
     await setActiveWindowId(win.id);
+    if (toolId) {
+        await setOverlaySyncedToolId(toolId);
+    }
 }
 
 async function showSystemNotification(message) {
@@ -177,16 +200,26 @@ chrome.commands.onCommand.addListener(async (command) => {
                     if (win.focused) {
                         await chrome.windows.update(activeWindowId, { state: 'minimized' });
                     } else {
-                        await focusTabForCurrentSelection(
-                            activeWindowId,
-                            settings.selectedToolId,
-                            settings.selectedToolUrl
-                        );
-                        await chrome.windows.update(activeWindowId, { focused: true, state: 'normal' });
+                        // Do not navigate on Alt+A — that reloads the page and often starts a "new chat".
+                        // Only navigate if the user changed Quick Tool in the popup since we last synced this tab.
+                        const syncedId = await getOverlaySyncedToolId();
+                        if (
+                            settings.selectedToolId &&
+                            syncedId !== null &&
+                            syncedId !== settings.selectedToolId
+                        ) {
+                            await navigateOverlayTab(
+                                activeWindowId,
+                                settings.selectedToolId,
+                                settings.selectedToolUrl
+                            );
+                        }
+                        await focusOverlayWithoutNavigation(activeWindowId);
                     }
                     return;
                 } catch (e) {
                     await setActiveWindowId(null);
+                    await setOverlaySyncedToolId(null);
                 }
             }
 
@@ -196,6 +229,9 @@ chrome.commands.onCommand.addListener(async (command) => {
             );
             const win = await createQuickToolWindow(openUrl);
             await setActiveWindowId(win.id);
+            if (settings.selectedToolId) {
+                await setOverlaySyncedToolId(settings.selectedToolId);
+            }
         } catch (err) {
             console.error('Error in toggle-overlay:', err);
         } finally {
@@ -243,5 +279,6 @@ chrome.windows.onRemoved.addListener(async (windowId) => {
     const activeWindowId = await getActiveWindowId();
     if (windowId === activeWindowId) {
         await setActiveWindowId(null);
+        await setOverlaySyncedToolId(null);
     }
 });
