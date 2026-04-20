@@ -1,6 +1,6 @@
 # Overlay
 
-**Version 1.0.2**
+**Version 1.0.3**
 
 *AI, right where you work.*
 
@@ -78,9 +78,9 @@ A separate privacy policy document for store listings may live under `webstore-u
 | Path | Role |
 |------|------|
 | `chrome-extension/` | Extension source: `manifest.json`, popup, dashboard, background service worker, styles, icons. |
-| `webstore-upload/` | Store assets such as `PRIVACY_POLICY.md` and packaged **`Overlay-1.0.2.zip`** for upload (regenerate the zip after changing the extension). |
+| `webstore-upload/` | Store assets such as `PRIVACY_POLICY.md` and packaged **`Overlay-1.0.3.zip`** for upload (regenerate the zip after changing the extension). |
 
 ---
 
-*Overlay v1.0.2 — Chrome extension*
+*Overlay v1.0.3 — Chrome extension*
 

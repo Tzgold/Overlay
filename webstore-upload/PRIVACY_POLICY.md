@@ -1,6 +1,6 @@
 # Overlay — Privacy Policy
 
-**Last updated:** April 2, 2026
+**Last updated:** April 20, 2026
 
 This policy describes how the **Overlay** Chrome extension (“Extension”) handles information. The Extension is developed to help you open websites you choose (for example, AI tools) in a separate small browser window.
 
@@ -15,6 +15,7 @@ The Extension stores data **locally in your browser** using Chrome’s `chrome.s
 
 - Your settings (for example, which tool is selected, order of tools, accent color).
 - The last URL you had open per tool (so returning to a tool can restore the same page when the site uses normal web addresses).
+- The current Quick Tool state used to control whether the overlay window is shown, minimized, focused, or reopened.
 
 **We do not operate servers for this Extension.** We do not receive this data. The developer does not collect, transmit, or sell your browsing history, prompts, or messages from third-party sites.
 
@@ -24,7 +25,7 @@ The Extension stores data **locally in your browser** using Chrome’s `chrome.s
 |-------------|---------|
 | **storage** | Save your settings and last URLs locally. |
 | **notifications** | Show simple messages when the Extension is off or no Quick Tool is selected (for example, when using the keyboard shortcut). |
-| **tabs**    | Update the address of the tab inside the Extension’s overlay window when you switch tools or restore a saved URL. |
+| **tabs**    | Update or activate the tab inside the Extension’s overlay window when you switch tools or restore a saved URL, and focus it without forced reload during shortcut toggles. |
 | **windows** | Create, focus, minimize, and position the small overlay window. |
 
 ## Third-party websites
